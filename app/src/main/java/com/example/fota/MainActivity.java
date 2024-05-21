@@ -2,14 +2,22 @@ package com.example.fota;
 
 import static android.content.ContentValues.TAG;
 
+import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.annotation.NonNull;
@@ -33,16 +41,11 @@ import java.util.Vector;
 
 
 public class MainActivity extends AppCompatActivity {
-    private List<String> ecuList = new Vector<>();
-    private List<String> firmwareList = new Vector<>();
-    private Spinner ecuSpinner;
-    private Button updateBtn;
-    private Spinner firmwareSpinner;
-    private String selectedFirmware;
-    private String selectedEcu;
-    private String firmwareVersion;
-    private DatabaseReference verRef;
 
+    private Spinner ecuSpinner;
+    private Button checkBtn;
+    private Spinner firmwareSpinner;
+    private TextView warningText;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,10 +56,11 @@ public class MainActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+        StateManager stateManager = StateManager.getInstance();
 
         // Firebase realtime database
-        FirebaseDatabase database = FirebaseDatabase.getInstance();
-        DatabaseReference dbRef = database.getReference();
+        stateManager.database = FirebaseDatabase.getInstance();
+        stateManager.rootRef = stateManager.database.getReference("ECU");
 
         // Firebase storage
         FirebaseStorage storage = FirebaseStorage.getInstance();
@@ -64,22 +68,26 @@ public class MainActivity extends AppCompatActivity {
 
         ecuSpinner = findViewById(R.id.ecuSpinner);
         firmwareSpinner = findViewById(R.id.firmwareSpinner);
-        updateBtn = findViewById(R.id.updateBtn);
+        stateManager.updateBtn = findViewById(R.id.updateBtn);
+        checkBtn = findViewById(R.id.Checkbutton);
+        warningText = findViewById(R.id.warningText);
 
-        dbRef.addValueEventListener(new ValueEventListener() {
+
+        stateManager.rootRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                ecuList.clear();
+                stateManager.ecuList.clear();
+                stateManager.ecuList.add("Please select an ECU");
+
                 for (DataSnapshot msnapshot : snapshot.getChildren()) {
                     String key = msnapshot.getKey();
-                    ecuList.add(key);
-                    System.out.println("Node Name (Key): " + key);
+                    stateManager.ecuList.add(key);
                 }
 
                 ArrayAdapter<String> ecuAdapter = new ArrayAdapter<>(
                         MainActivity.this,
                         android.R.layout.simple_spinner_item,
-                        ecuList
+                        stateManager.ecuList
                 );
                 ecuAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 ecuSpinner.setAdapter(ecuAdapter);
@@ -96,28 +104,36 @@ public class MainActivity extends AppCompatActivity {
         ecuSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> adapterView, View view, int position, long l) {
-                selectedEcu = (String)adapterView.getItemAtPosition(position);
-                System.out.println("selectedEcu: " + selectedEcu);
-                verRef = database.getReference(selectedEcu + "/version");
-                System.out.println("verRef: " + verRef);
+                stateManager.selectedEcu = (String)adapterView.getItemAtPosition(position);
+                System.out.println("selectedEcu: " + stateManager.selectedEcu);
+                if (!"Please select an ECU".equals(stateManager.selectedEcu)) {
+                    stateManager.verRef = stateManager.database.getReference("ECU/" + stateManager.selectedEcu + "/version");
+                    System.out.println("verRef: " + stateManager.verRef);
+                    stateManager.ecuUpdateVef = stateManager.database.getReference("ECU_UPDATE");
 
-                // firmware list
-                StorageReference firmwareRef = storageRef.child(selectedEcu);
-                firmwareList.clear();
-                firmwareRef.listAll().addOnSuccessListener(listResult -> {
-                    for (StorageReference item : listResult.getItems()) {
+                    // firmware list
+                    StorageReference firmwareRef = storageRef.child(stateManager.selectedEcu);
+                    stateManager.firmwareList.clear();
+                    stateManager.firmwareList.add("Please select firmware");
+                    firmwareRef.listAll().addOnSuccessListener(listResult -> {
+                        for (StorageReference item : listResult.getItems()) {
                             System.out.println("firmware: " + item.getName());
-                            firmwareList.add(item.getName());
-                    }
+                            stateManager.firmwareList.add(item.getName());
+                        }
 
-                    ArrayAdapter<String> firmwareAdapter = new ArrayAdapter<>(
-                            MainActivity.this,
-                            android.R.layout.simple_spinner_item,
-                            firmwareList
-                    );
-                    firmwareAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    firmwareSpinner.setAdapter(firmwareAdapter);
-                });
+                        ArrayAdapter<String> firmwareAdapter = new ArrayAdapter<>(
+                                MainActivity.this,
+                                android.R.layout.simple_spinner_item,
+                                stateManager.firmwareList
+                        );
+                        firmwareAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                        firmwareSpinner.setAdapter(firmwareAdapter);
+                    });
+
+                } else {
+                    stateManager.firmwareList.clear();
+                    stateManager.firmwareList.add("");
+                }
             }
 
             @Override
@@ -129,10 +145,12 @@ public class MainActivity extends AppCompatActivity {
         firmwareSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> adapterView, View view, int position, long l) {
-                selectedFirmware = (String)adapterView.getItemAtPosition(position);
-                System.out.println("selectedFirmware: " + selectedFirmware);
-                firmwareVersion = getVerFirmware(selectedFirmware);
-                System.out.println("version: " + firmwareVersion);
+                stateManager.selectedFirmware = (String)adapterView.getItemAtPosition(position);
+                if (!"Please select firmware".equals(stateManager.selectedFirmware)) {
+                    System.out.println("selectedFirmware: " + stateManager.selectedFirmware);
+                    stateManager.firmwareVersion = getVerFirmware(stateManager.selectedFirmware);
+                    System.out.println("version: " + stateManager.firmwareVersion);
+                }
             }
 
             @Override
@@ -141,14 +159,63 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        updateBtn.setOnClickListener(new View.OnClickListener() {
+        stateManager.updateBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                verRef.setValue(firmwareVersion);
-                System.out.println("Update");
+                if (!"Please select an ECU".equals(stateManager.selectedEcu) && !"Please select firmware".equals(stateManager.selectedFirmware)) {
+                    stateManager.verRef.setValue(stateManager.firmwareVersion);
+                    String ecu_update = stateManager.selectedEcu;
+                    System.out.println("Update");
+                    stateManager.ecuUpdateVef.setValue(stateManager.selectedEcu);
+
+                    stateManager.statusRef = stateManager.database.getReference("ECU/" + stateManager.selectedEcu + "/status");
+                    stateManager.statusRef.addValueEventListener(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                            String newStatus = snapshot.getValue(String.class);
+                            if (!newStatus.equals(stateManager.status)) {
+                                stateManager.status = newStatus;
+
+                                System.out.println("main status: " + stateManager.status);
+                                if (stateManager.status.equals("UPDATE")) {
+                                    stateManager.selectedEcuList.add(ecu_update);
+                                    System.out.println("ADDED: " + ecu_update);
+                                    Intent intent = new Intent(MainActivity.this, FLashActivity.class);
+                                    startActivity(intent);
+                                } else if (stateManager.status.equals("REJECT")) {
+
+                                    LayoutInflater inflater = getLayoutInflater();
+                                    View layout = inflater.inflate(R.layout.custom_toast,
+                                            null);
+
+                                    TextView text = (TextView) layout.findViewById(R.id.textView);
+                                    text.setText("Update is rejected!");
+
+                                    Toast toast = new Toast(getApplicationContext());
+                                    toast.setGravity(Gravity.TOP, 0, 300);
+                                    toast.setDuration(Toast.LENGTH_LONG);
+                                    toast.setView(layout);
+                                    toast.show();
+                                }
+                            }
+                        }
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+
+                        }
+                    });
+                }
+
             }
         });
 
+        checkBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(MainActivity.this, FLashActivity.class);
+                startActivity(intent);
+            }
+        });
     }
 
     public String getVerFirmware(String selectedFirmware) {
