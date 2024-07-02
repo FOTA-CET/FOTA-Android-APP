@@ -23,6 +23,7 @@ public class StateManager {
         DatabaseReference statusRef;
         DatabaseReference rootRef;
         Button updateBtn;
+        String percent;
         public static synchronized StateManager getInstance() {
         if (instance == null) {
             instance = new StateManager();

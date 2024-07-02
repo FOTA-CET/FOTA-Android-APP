@@ -2,8 +2,11 @@ package com.example.fota;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -39,7 +42,7 @@ public class FLashActivity extends AppCompatActivity {
             return insets;
         });
 
-        Button returnButton = findViewById(R.id.returnBtn);
+        ImageButton returnButton = findViewById(R.id.returnBtn);
         StateManager stateManager = StateManager.getInstance();
         progressbarList = new Vector<>();
         LinearLayout layout = findViewById(R.id.progressLayout);
@@ -49,10 +52,11 @@ public class FLashActivity extends AppCompatActivity {
 
             LinearLayout horizontalLayout = new LinearLayout(this);
             horizontalLayout.setOrientation(LinearLayout.HORIZONTAL);
+            horizontalLayout.setGravity(Gravity.CENTER_VERTICAL);
             horizontalLayout.setLayoutParams(new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT));
-            horizontalLayout.setPadding(70, 16, 16, 16); // Đặt padding nếu cần thiết
+            horizontalLayout.setPadding(70, 0, 16, 16); // Đặt padding nếu cần thiết
 
             TextView textView = new TextView(this);
             textView.setText(x);
@@ -60,15 +64,16 @@ public class FLashActivity extends AppCompatActivity {
             LinearLayout.LayoutParams textLayoutParams = new LinearLayout.LayoutParams(textWidth, LinearLayout.LayoutParams.WRAP_CONTENT);
 
             textView.setLayoutParams(textLayoutParams);
-            textView.setPadding(0, 0, 16, 0); // Đặt padding nếu cần thiết
+            textView.setPadding(0, 0, 14, 0); // Đặt padding nếu cần thiết
 
             ProgressBar progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-            int width = (int) (250 * getResources().getDisplayMetrics().density);
+            int width = (int) (230 * getResources().getDisplayMetrics().density);
             LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT);
 
             progressBar.setLayoutParams(layoutParams);
             progressBar.setMax(100);
             progressBar.setProgress(0);
+            progressBar.setPadding(0, 0, 15, 0);
 
             horizontalLayout.addView(textView);
             horizontalLayout.addView(progressBar);
@@ -77,6 +82,78 @@ public class FLashActivity extends AppCompatActivity {
             progressbarList.add(progressBar);
 
             DatabaseReference progressRef = stateManager.database.getReference("ECU/" + x + "/percent");
+            DatabaseReference statusRef = stateManager.database.getReference("ECU/" + x + "/status");
+
+            statusRef.addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    String status = snapshot.getValue(String.class);
+                    if (status.equals("FAILED")) {
+                        ImageButton failedBtn = new ImageButton(FLashActivity.this);
+                        failedBtn.setImageResource(R.drawable.failed);
+                        failedBtn.setBackgroundColor(0x00000000);
+                        failedBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        int buttonSize = (int) (40 * getResources().getDisplayMetrics().density);
+
+                        LinearLayout.LayoutParams buttonLayoutParams = new LinearLayout.LayoutParams(buttonSize, buttonSize);
+                        buttonLayoutParams.gravity = Gravity.CENTER_VERTICAL;
+                        failedBtn.setLayoutParams(buttonLayoutParams);
+                        horizontalLayout.addView(failedBtn);
+
+                        ImageButton againbtn = new ImageButton(FLashActivity.this);
+                        againbtn.setImageResource(R.drawable.again);
+                        againbtn.setBackgroundColor(0x00000000);
+                        againbtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
+
+                        againbtn.setLayoutParams(buttonLayoutParams);
+                        horizontalLayout.addView(againbtn);
+
+                        int width = (int) (200 * getResources().getDisplayMetrics().density);
+                        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT);
+
+
+                        progressBar.setLayoutParams(layoutParams);
+
+                        failedBtn.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View view) {
+                                progressRef.setValue("100");
+                                progressRef.setValue("0");
+                            }
+                        });
+
+                        againbtn.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View view) {
+                                stateManager.ecuUpdateVef.setValue(x);
+                                DatabaseReference statusRef = stateManager.database.getReference("ECU/" + x + "/status");
+                                statusRef.addValueEventListener(new ValueEventListener() {
+                                    @Override
+                                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                                        String newStatus = snapshot.getValue(String.class);
+                                        if (newStatus.equals("UPDATE")) {
+                                            stateManager.selectedEcuList.remove(x);
+                                            layout.removeView(horizontalLayout);
+                                            recreate();
+                                        }
+                                    }
+
+                                    @Override
+                                    public void onCancelled(@NonNull DatabaseError error) {
+
+                                    }
+                                });
+
+                            }
+                        });
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+
+                }
+            });
 
             progressRef.addValueEventListener(new ValueEventListener() {
                 @Override

@@ -13,6 +13,7 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
@@ -27,15 +28,18 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.database.annotations.Nullable;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.ListResult;
 import com.google.firebase.storage.StorageReference;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
 
@@ -43,7 +47,7 @@ import java.util.Vector;
 public class MainActivity extends AppCompatActivity {
 
     private Spinner ecuSpinner;
-    private Button checkBtn;
+    private ImageButton checkBtn;
     private Spinner firmwareSpinner;
     private TextView warningText;
     @Override
@@ -69,20 +73,16 @@ public class MainActivity extends AppCompatActivity {
         ecuSpinner = findViewById(R.id.ecuSpinner);
         firmwareSpinner = findViewById(R.id.firmwareSpinner);
         stateManager.updateBtn = findViewById(R.id.updateBtn);
-        checkBtn = findViewById(R.id.Checkbutton);
+        checkBtn = findViewById(R.id.checkBtn);
         warningText = findViewById(R.id.warningText);
+        stateManager.ecuList.clear();
+        stateManager.ecuList.add("Please select an ECU");
 
-
-        stateManager.rootRef.addValueEventListener(new ValueEventListener() {
+        stateManager.rootRef.addChildEventListener(new ChildEventListener() {
             @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                stateManager.ecuList.clear();
-                stateManager.ecuList.add("Please select an ECU");
-
-                for (DataSnapshot msnapshot : snapshot.getChildren()) {
-                    String key = msnapshot.getKey();
-                    stateManager.ecuList.add(key);
-                }
+            public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+                String key = snapshot.getKey();
+                stateManager.ecuList.add(key);
 
                 ArrayAdapter<String> ecuAdapter = new ArrayAdapter<>(
                         MainActivity.this,
@@ -94,8 +94,23 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
+            public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+
+            }
+
+            @Override
+            public void onChildRemoved(@NonNull DataSnapshot snapshot) {
+
+            }
+
+            @Override
+            public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+
+            }
+
+            @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                ////
+
             }
         });
 
@@ -132,7 +147,13 @@ public class MainActivity extends AppCompatActivity {
 
                 } else {
                     stateManager.firmwareList.clear();
-                    stateManager.firmwareList.add("");
+                    ArrayAdapter<String> emptyAdapter = new ArrayAdapter<>(
+                            MainActivity.this,
+                            android.R.layout.simple_spinner_item,
+                            new Vector<>()
+                    );
+                    emptyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    firmwareSpinner.setAdapter(emptyAdapter);
                 }
             }
 
