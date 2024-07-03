@@ -73,6 +73,7 @@ public class MainActivity extends AppCompatActivity {
         ecuSpinner = findViewById(R.id.ecuSpinner);
         firmwareSpinner = findViewById(R.id.firmwareSpinner);
         stateManager.updateBtn = findViewById(R.id.updateBtn);
+        stateManager.rstBtn = findViewById(R.id.rstBtn);
         checkBtn = findViewById(R.id.checkBtn);
         warningText = findViewById(R.id.warningText);
         stateManager.ecuList.clear();
@@ -125,7 +126,8 @@ public class MainActivity extends AppCompatActivity {
                     stateManager.verRef = stateManager.database.getReference("ECU/" + stateManager.selectedEcu + "/version");
                     System.out.println("verRef: " + stateManager.verRef);
                     stateManager.ecuUpdateVef = stateManager.database.getReference("ECU_UPDATE");
-
+                    stateManager.ecuResetRef = stateManager.database.getReference("ECU_RESET");
+                    System.out.println("ResetRef: " + stateManager.ecuResetRef);
                     // firmware list
                     StorageReference firmwareRef = storageRef.child(stateManager.selectedEcu);
                     stateManager.firmwareList.clear();
@@ -227,6 +229,17 @@ public class MainActivity extends AppCompatActivity {
                     });
                 }
 
+            }
+        });
+
+        stateManager.rstBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (!"Please select an ECU".equals(stateManager.selectedEcu)) {
+                    String ecu_update = stateManager.selectedEcu;
+                    System.out.println("Reset");
+                    stateManager.ecuResetRef.setValue(stateManager.selectedEcu);
+                }
             }
         });
 

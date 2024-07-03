@@ -22,7 +22,9 @@ public class StateManager {
         String status;
         DatabaseReference statusRef;
         DatabaseReference rootRef;
+        DatabaseReference ecuResetRef;
         Button updateBtn;
+        Button rstBtn;
         String percent;
         public static synchronized StateManager getInstance() {
         if (instance == null) {
